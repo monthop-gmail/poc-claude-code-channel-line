@@ -1,0 +1,15 @@
+{
+  "name": "claude-channel-line",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Claude Code channel plugin for LINE messaging",
+  "main": "line.ts",
+  "scripts": {
+    "start": "bun run line.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "latest",
+    "@line/bot-sdk": "^9.0.0",
+    "zod": "^3.24.0"
+  }
+}
