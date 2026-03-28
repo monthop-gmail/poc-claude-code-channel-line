@@ -109,6 +109,57 @@ claude --dangerously-load-development-channels server:line
 
 **botforge server** เหมาะกับ: deploy เป็น service 24/7 + Web UI + หลาย user
 
+## Roadmap
+
+ปัจจุบัน Channel plugin ทำงานเมื่อเปิด Claude Code session อยู่ แผนถัดไปคือเพิ่มให้รัน 24/7 + Web UI + หลาย user โดยไม่ต้องพึ่ง botforge server
+
+### Phase 1: 24/7 Headless (Docker)
+
+รัน `claude --channels server:line` ใน Docker container ให้ทำงานตลอดเวลา
+
+```
+poc-claude-code-channel-line/
+├── line.ts              # Channel plugin (มีอยู่แล้ว)
+├── Dockerfile           # รัน Claude Code + channel ใน container
+└── docker-compose.yml   # deploy + cloudflare tunnel
+```
+
+```dockerfile
+FROM node:22-slim
+RUN npm install -g @anthropic-ai/claude-code bun
+COPY . /app
+CMD ["claude", "--channels", "server:line", "--dangerously-skip-permissions"]
+```
+
+### Phase 2: Web UI
+
+เพิ่มหน้าเว็บดู session + chat history ที่ channel plugin จัดการอยู่
+
+```
+├── web-ui/
+│   ├── index.html       # Session list + chat view
+│   └── server.js        # Proxy + login
+```
+
+### Phase 3: Multi-user
+
+รองรับหลาย user ใช้พร้อมกัน — allowlist + pairing flow รองรับอยู่แล้ว เพิ่มแค่:
+- แยก session ต่อ LINE user
+- Web UI แสดง session ทุกคน
+- Cost tracking ต่อ user
+
+### เป้าหมาย
+
+| Feature | ตอนนี้ | หลัง Roadmap |
+|---------|:-:|:-:|
+| ใช้จาก LINE | ✅ | ✅ |
+| Permission relay | ✅ | ✅ |
+| รัน 24/7 | ❌ | ✅ Docker |
+| Web UI | ❌ | ✅ |
+| หลาย user | ⚠️ allowlist only | ✅ แยก session |
+| ต้องสร้าง server เอง | ❌ | ❌ ยังไม่ต้อง |
+| Docker containers | 0 | 2 (Claude Code + Tunnel) |
+
 ## Related Projects
 
 - [poc-claude-code-plugin-line-bot](https://github.com/monthop-gmail/poc-claude-code-plugin-line-bot) — botforge server approach (LINE + Web UI + Docker)
