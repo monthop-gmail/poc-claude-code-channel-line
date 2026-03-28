@@ -86,16 +86,34 @@ claude --dangerously-load-development-channels server:line
 | `yes <code>` | อนุมัติ permission request |
 | `no <code>` | ปฏิเสธ permission request |
 
-## vs เดิม (botforge server)
+## Claude Code CLI vs Channel Plugin vs botforge server
 
-| | เดิม (botforge) | Channel plugin (ใหม่) |
-|---|---|---|
-| สถาปัตยกรรม | LINE → HTTP Server → Agent SDK → Claude | LINE → MCP Channel → Claude session ตรงๆ |
-| ต้องสร้าง server | ✅ ต้องสร้าง agent-service | ❌ ไม่ต้อง |
-| Docker | ✅ 4 containers | ❌ ไม่จำเป็น |
-| Session management | สร้างเอง | ✅ ใช้ของ Claude Code |
-| Permission relay | ❌ | ✅ approve/deny จาก LINE |
-| ต้องรัน Claude Code | ❌ agent-service รันแทน | ✅ ต้องเปิด session |
+| Feature | Claude Code CLI | Channel Plugin (นี้) | botforge server |
+|---------|:-:|:-:|:-:|
+| เข้าถึง | Terminal เท่านั้น | LINE + Terminal | LINE + Web UI |
+| ไม่ต้องติดตั้ง | ❌ ต้องติดตั้ง CLI | ✅ มี LINE ก็พอ | ✅ มี LINE/browser ก็พอ |
+| ใช้จากมือถือ | ❌ | ✅ ส่ง LINE ได้ทันที | ✅ LINE + Web UI |
+| สร้าง server เอง | ❌ ไม่ต้อง | ❌ ไม่ต้อง | ✅ ต้องสร้าง agent-service |
+| Docker containers | 0 | 0 | 4 ตัว |
+| Permission relay | Terminal เท่านั้น | ✅ approve/deny จาก LINE | ❌ |
+| Tool use (Read, Edit, Bash) | ✅ | ✅ | ✅ |
+| MCP support | ✅ | ✅ | ✅ |
+| Session management | ✅ built-in | ✅ ใช้ของ Claude Code | สร้างเอง |
+| Cost tracking | ❌ | ❌ | ✅ ต่อ session |
+| Web UI | ❌ | ❌ | ✅ |
+| รัน 24/7 headless | ❌ | ❌ ต้องเปิด session | ✅ Docker |
+| ค่าใช้จ่ายเพิ่ม | ไม่มี | ไม่มี (OAuth เดียวกัน) | ไม่มี (OAuth เดียวกัน) |
+| Cloud cost | ❌ local | ❌ local | ❌ Cloudflare Tunnel (ฟรี) |
+
+**Channel plugin** เหมาะกับ: ใช้เอง ส่ง LINE ขณะ Claude Code เปิดอยู่
+
+**botforge server** เหมาะกับ: deploy เป็น service 24/7 + Web UI + หลาย user
+
+## Related Projects
+
+- [poc-claude-code-plugin-line-bot](https://github.com/monthop-gmail/poc-claude-code-plugin-line-bot) — botforge server approach (LINE + Web UI + Docker)
+- [poc-opencode-plugin-line-bot](https://github.com/monthop-gmail/poc-opencode-plugin-line-bot) — OpenCode plugin (LINE + `opencode serve`)
+- [botforge](https://github.com/monthop-gmail/botforge) — shared agent service
 
 ## Requirements
 
