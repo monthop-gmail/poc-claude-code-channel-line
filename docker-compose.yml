@@ -1,0 +1,25 @@
+services:
+  cowork-claudecode-line-bot:
+    build: .
+    container_name: cowork-claudecode-line-bot
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    ports:
+      - "3000:3000"
+    environment:
+      LINE_CHANNEL_ACCESS_TOKEN: ${LINE_CHANNEL_ACCESS_TOKEN}
+      LINE_CHANNEL_SECRET: ${LINE_CHANNEL_SECRET}
+      LINE_WEBHOOK_PORT: "3000"
+    volumes:
+      # OAuth session — run `claude` on host first to authenticate
+      - ${HOME}/.claude:/home/node/.claude
+      - ${HOME}/.claude.json:/home/node/.claude.json
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - cowork-claudecode-line-bot

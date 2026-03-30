@@ -3,11 +3,7 @@
     "line": {
       "command": "bun",
       "args": ["./line.ts"],
-      "env": {
-        "LINE_CHANNEL_ACCESS_TOKEN": "",
-        "LINE_CHANNEL_SECRET": "",
-        "LINE_WEBHOOK_PORT": "3000"
-      }
+      "env": {}
     }
   }
 }

@@ -15,67 +15,63 @@ LINE App ← Push Message ← Channel Plugin ←──────┘
 - Permission relay — approve/deny tool use จาก LINE
 - Sender allowlist + pairing flow
 - ใช้ Claude Code Channels protocol (MCP)
+- รัน 24/7 ด้วย Docker + Cloudflare Tunnel
 
-## Setup
+## Setup (Docker)
 
-### 1. ติดตั้ง
+### 1. Clone และตั้งค่า
 
 ```bash
 git clone https://github.com/monthop-gmail/poc-claude-code-channel-line.git
 cd poc-claude-code-channel-line
-bun install
+cp .env.example .env
 ```
 
-### 2. ตั้งค่า LINE Bot
+แก้ `.env` ใส่ค่าจริง:
 
-สร้าง LINE Bot ที่ https://developers.line.biz/console/ แล้วตั้ง env:
-
-```bash
-export LINE_CHANNEL_ACCESS_TOKEN=your_token
-export LINE_CHANNEL_SECRET=your_secret
+```env
+LINE_CHANNEL_ACCESS_TOKEN=...
+LINE_CHANNEL_SECRET=...
+CLOUDFLARE_TUNNEL_TOKEN=...
 ```
 
-หรือแก้ `.mcp.json` ใส่ค่าตรงๆ
-
-### 3. รัน Claude Code กับ channel
+### 2. Login Claude บน host (ครั้งแรกครั้งเดียว)
 
 ```bash
-claude --dangerously-load-development-channels server:line
+claude   # login แล้ว ctrl+c ออก
+```
+
+### 3. รัน
+
+```bash
+docker compose up -d
 ```
 
 ### 4. ตั้ง Webhook URL
 
 ที่ LINE Developer Console → Messaging API:
-- Webhook URL: `http://localhost:3000/webhook` (หรือผ่าน Cloudflare Tunnel)
+- Webhook URL: `https://<your-tunnel-domain>/webhook`
 - เปิด **Use webhook** = ON
-
-### 5. Pair sender
-
-ส่งข้อความจาก LINE จะได้ pairing code กลับมา แล้วรันใน Claude Code:
-
-```
-/line:access pair <code>
-```
-
-จากนั้น lock ให้เฉพาะ user ที่ pair แล้ว:
-
-```
-/line:access policy allowlist
-```
 
 ## Architecture
 
 ```
-┌──────────┐     ┌─────────────────┐     ┌──────────────┐
-│ LINE App │────▶│ line.ts          │────▶│ Claude Code  │
-│          │◀────│ (MCP Channel)   │◀────│ Session      │
-└──────────┘     │                 │     │              │
-  webhook POST   │ • channel event │     │ • reads event│
-  push message   │ • reply tool    │     │ • calls tool │
-                 │ • permission    │     │ • works on   │
-                 │   relay         │     │   your files │
-                 └─────────────────┘     └──────────────┘
-                   stdio transport
+┌──────────┐     ┌──────────────────┐     ┌──────────────┐
+│ LINE App │────▶│ line.ts           │────▶│ Claude Code  │
+│          │◀────│ (MCP Channel)    │◀────│ Session      │
+└──────────┘     │                  │     │              │
+  webhook POST   │ • channel event  │     │ • reads event│
+  push message   │ • reply tool     │     │ • calls tool │
+                 │ • permission     │     │ • works on   │
+                 │   relay          │     │   your files │
+                 └──────────────────┘     └──────────────┘
+                    stdio transport
+
+LINE App ──→ cowork-claudecode.sumana.online
+               ↓ Cloudflare Tunnel
+             cowork-claudecode-line-bot:3000 (Docker)
+               ↓ MCP stdio
+             Claude Code session
 ```
 
 ## LINE Commands (ใน Chat)
@@ -86,79 +82,44 @@ claude --dangerously-load-development-channels server:line
 | `yes <code>` | อนุมัติ permission request |
 | `no <code>` | ปฏิเสธ permission request |
 
+## ข้อจำกัด
+
+- **1 session ต่อ bot** — ทุก LINE user คุยกับ Claude session เดียวกัน ไม่มี context แยกต่อ user
+- **ต้องเปิด Claude session ไว้** — ถ้า container restart จะเริ่ม session ใหม่
+
 ## Claude Code CLI vs Channel Plugin vs botforge server
 
 | Feature | Claude Code CLI | Channel Plugin (นี้) | botforge server |
 |---------|:-:|:-:|:-:|
 | เข้าถึง | Terminal เท่านั้น | LINE + Terminal | LINE + Web UI |
-| ไม่ต้องติดตั้ง | ❌ ต้องติดตั้ง CLI | ✅ มี LINE ก็พอ | ✅ มี LINE/browser ก็พอ |
 | ใช้จากมือถือ | ❌ | ✅ ส่ง LINE ได้ทันที | ✅ LINE + Web UI |
 | สร้าง server เอง | ❌ ไม่ต้อง | ❌ ไม่ต้อง | ✅ ต้องสร้าง agent-service |
-| Docker containers | 0 | 0 | 4 ตัว |
+| Docker containers | 0 | 2 (Claude + Tunnel) | 4 ตัว |
 | Permission relay | Terminal เท่านั้น | ✅ approve/deny จาก LINE | ❌ |
 | Tool use (Read, Edit, Bash) | ✅ | ✅ | ✅ |
-| MCP support | ✅ | ✅ | ✅ |
 | Session management | ✅ built-in | ✅ ใช้ของ Claude Code | สร้างเอง |
-| Cost tracking | ❌ | ❌ | ✅ ต่อ session |
+| รัน 24/7 headless | ❌ | ✅ Docker | ✅ Docker |
 | Web UI | ❌ | ❌ | ✅ |
-| รัน 24/7 headless | ❌ | ❌ ต้องเปิด session | ✅ Docker |
-| ค่าใช้จ่ายเพิ่ม | ไม่มี | ไม่มี (OAuth เดียวกัน) | ไม่มี (OAuth เดียวกัน) |
-| Cloud cost | ❌ local | ❌ local | ❌ Cloudflare Tunnel (ฟรี) |
+| หลาย user (แยก session) | ❌ | ❌ | ✅ |
+| Cost tracking | ❌ | ❌ | ✅ ต่อ session |
 
-**Channel plugin** เหมาะกับ: ใช้เอง ส่ง LINE ขณะ Claude Code เปิดอยู่
+**Channel plugin** เหมาะกับ: ใช้คนเดียว รัน 24/7 ไม่ต้องการ Web UI
 
-**botforge server** เหมาะกับ: deploy เป็น service 24/7 + Web UI + หลาย user
+**botforge server** เหมาะกับ: deploy เป็น service + Web UI + หลาย user
 
 ## Roadmap
 
-ปัจจุบัน Channel plugin ทำงานเมื่อเปิด Claude Code session อยู่ แผนถัดไปคือเพิ่มให้รัน 24/7 + Web UI + หลาย user โดยไม่ต้องพึ่ง botforge server
+### ✅ Phase 1: 24/7 Headless (Docker)
 
-### Phase 1: 24/7 Headless (Docker)
-
-รัน `claude --channels server:line` ใน Docker container ให้ทำงานตลอดเวลา
-
-```
-poc-claude-code-channel-line/
-├── line.ts              # Channel plugin (มีอยู่แล้ว)
-├── Dockerfile           # รัน Claude Code + channel ใน container
-└── docker-compose.yml   # deploy + cloudflare tunnel
-```
-
-```dockerfile
-FROM node:22-slim
-RUN npm install -g @anthropic-ai/claude-code bun
-COPY . /app
-CMD ["claude", "--channels", "server:line", "--dangerously-skip-permissions"]
-```
+รัน Claude Code + LINE channel ใน Docker container พร้อม Cloudflare Tunnel — **เสร็จแล้ว**
 
 ### Phase 2: Web UI
 
-เพิ่มหน้าเว็บดู session + chat history ที่ channel plugin จัดการอยู่
-
-```
-├── web-ui/
-│   ├── index.html       # Session list + chat view
-│   └── server.js        # Proxy + login
-```
+เพิ่มหน้าเว็บดู session + chat history
 
 ### Phase 3: Multi-user
 
-รองรับหลาย user ใช้พร้อมกัน — allowlist + pairing flow รองรับอยู่แล้ว เพิ่มแค่:
-- แยก session ต่อ LINE user
-- Web UI แสดง session ทุกคน
-- Cost tracking ต่อ user
-
-### เป้าหมาย
-
-| Feature | ตอนนี้ | หลัง Roadmap |
-|---------|:-:|:-:|
-| ใช้จาก LINE | ✅ | ✅ |
-| Permission relay | ✅ | ✅ |
-| รัน 24/7 | ❌ | ✅ Docker |
-| Web UI | ❌ | ✅ |
-| หลาย user | ⚠️ allowlist only | ✅ แยก session |
-| ต้องสร้าง server เอง | ❌ | ❌ ยังไม่ต้อง |
-| Docker containers | 0 | 2 (Claude Code + Tunnel) |
+รองรับหลาย user แยก session ต่อ LINE user
 
 ## Related Projects
 
@@ -168,7 +129,8 @@ CMD ["claude", "--channels", "server:line", "--dangerously-skip-permissions"]
 
 ## Requirements
 
-- Claude Code v2.1.80+
-- Bun runtime
-- claude.ai login (OAuth)
+- Docker + Docker Compose
+- Claude Code (installed on host for initial login)
+- claude.ai account (OAuth)
 - LINE Bot credentials
+- Cloudflare Tunnel token
